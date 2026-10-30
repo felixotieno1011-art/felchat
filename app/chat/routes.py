@@ -7,6 +7,7 @@ from app.auth.models import User
 from app.clients.llm.groq import llm_client
 from app.core.db import get_db
 from app.rag.service import retrieve_context
+from app.security.waf import check_prompt_injection
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -25,16 +26,19 @@ async def send_message(
     if not llm_client.api_key:
         raise HTTPException(status_code=500, detail="Groq API key is missing in .env")
 
-    # 1. Search the database for relevant security context
+    # 1. SECURITY: Check for Prompt Injection
+    if check_prompt_injection(payload.message):
+        return ChatResponse(reply="⚠️ Security Alert: Your message was flagged for prompt injection. Please ask a valid question.")
+
+    # 2. RAG: Search the database for relevant security context
     rag_context = await retrieve_context(payload.message, db)
 
-    # 2. Build the system prompt with the RAG data
+    # 3. Build the system prompt
     system_prompt = (
         "You are FelChat, a highly intelligent, professional, and security-focused AI assistant. "
         "You have access to a database of real CVEs (Common Vulnerabilities and Exposures). "
         "If the user asks about a vulnerability, CVE, or security flaw, use the provided context to answer. "
-        "If the context doesn't contain the answer, say you don't have that specific CVE in your database, "
-        "but answer using your general knowledge.\n\n"
+        "If the context doesn't contain the answer, answer using your general knowledge.\n\n"
         f"--- CONTEXT ---\n{rag_context}\n---------------\n"
     )
 
