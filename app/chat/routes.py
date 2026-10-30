@@ -8,6 +8,7 @@ from app.clients.llm.groq import llm_client
 from app.core.db import get_db
 from app.rag.service import retrieve_context
 from app.security.waf import check_prompt_injection
+from app.security.ratelimit import check_rate_limit
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -25,6 +26,9 @@ async def send_message(
 ):
     if not llm_client.api_key:
         raise HTTPException(status_code=500, detail="Groq API key is missing in .env")
+
+    # 0. SECURITY: Rate Limit
+    await check_rate_limit(str(current_user.id))
 
     # 1. SECURITY: Check for Prompt Injection
     if check_prompt_injection(payload.message):
