@@ -1,0 +1,4 @@
+.message pre { background: #2A1F0A; color: #F5E6A8; padding: 12px; border-radius: 8px; overflow-x: auto; margin-top: 8px; }
+.message code { font-family: monospace; background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; }
+.message p { margin-bottom: 8px; }
+.message p:last-child { margin-bottom: 0; }

@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.auth.dependencies import get_current_user
@@ -24,6 +25,8 @@ async def send_message(
     system_prompt = (
         "You are FelChat, a highly intelligent, professional, and security-focused AI assistant. "
         "You answer general questions accurately but excel at cybersecurity, programming, and logic. "
+        "You have a tool to search the web. If the user asks about current events, latest CVEs, "
+        "or anything you are unsure about, USE the browser_search tool to get the facts. "
         "Keep your answers concise and helpful."
     )
 

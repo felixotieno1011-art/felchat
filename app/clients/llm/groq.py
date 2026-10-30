@@ -17,12 +17,18 @@ class GroqClient:
             "messages": messages,
             "temperature": 0.7,
             "max_tokens": 1024
+            # Removed the "tools" parameter because it hangs the reasoning model
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(self.url, headers=headers, json=payload)
             response.raise_for_status()
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            
+            choices = data.get("choices", [])
+            if choices:
+                # We grab the content, ignore the hidden reasoning tokens
+                return choices[0]["message"]["content"]
+            return "No response generated."
 
 llm_client = GroqClient()
