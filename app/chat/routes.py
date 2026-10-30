@@ -1,9 +1,12 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.clients.llm.groq import llm_client
+from app.core.db import get_db
+from app.rag.service import retrieve_context
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -16,18 +19,23 @@ class ChatResponse(BaseModel):
 @router.post("/message", response_model=ChatResponse)
 async def send_message(
     payload: ChatRequest, 
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     if not llm_client.api_key:
         raise HTTPException(status_code=500, detail="Groq API key is missing in .env")
 
-    # FelChat System Persona
+    # 1. Search the database for relevant security context
+    rag_context = await retrieve_context(payload.message, db)
+
+    # 2. Build the system prompt with the RAG data
     system_prompt = (
         "You are FelChat, a highly intelligent, professional, and security-focused AI assistant. "
-        "You answer general questions accurately but excel at cybersecurity, programming, and logic. "
-        "You have a tool to search the web. If the user asks about current events, latest CVEs, "
-        "or anything you are unsure about, USE the browser_search tool to get the facts. "
-        "Keep your answers concise and helpful."
+        "You have access to a database of real CVEs (Common Vulnerabilities and Exposures). "
+        "If the user asks about a vulnerability, CVE, or security flaw, use the provided context to answer. "
+        "If the context doesn't contain the answer, say you don't have that specific CVE in your database, "
+        "but answer using your general knowledge.\n\n"
+        f"--- CONTEXT ---\n{rag_context}\n---------------\n"
     )
 
     messages = [
