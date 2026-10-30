@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.db import Base
 # Import all models here so Alembic can see them
 from app.auth.models import User  # noqa: F401
+from app.rag.models import Document  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
