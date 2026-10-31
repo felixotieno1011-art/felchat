@@ -9,7 +9,7 @@ function appendMessage(text, role) {
     const div = document.createElement('div');
     div.className = `message ${role}`;
     if (role === 'assistant') {
-        div.innerHTML = marked.parse(text);
+        div.innerHTML = DOMPurify.sanitize(marked.parse(text));
         // Save to history
         conversationHistory.push({ role: "assistant", content: text });
     } else {

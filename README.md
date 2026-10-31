@@ -22,7 +22,7 @@ Built from scratch by Felix Otieno as a portfolio project to demonstrate experti
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript (with `marked.js` for Markdown)
 
 ## 🏗️ Architecture
-1. **Frontend:** User sends a message via SSE (Server-Sent Events).
+1. **Frontend:** User sends a message via HTTP POST (JSON).
 2. **WAF:** Checks for prompt injection patterns and rate limits (Redis).
 3. **RAG Pipeline:** Converts the query to a vector using Hugging Face, searches Postgres (`pgvector`) for relevant CVEs, and builds a context prompt.
 4. **LLM:** Groq generates the final response using the context.
