@@ -70,6 +70,8 @@ async def send_message(
         reply = await llm_client.chat(messages)
         return ChatResponse(reply=reply)
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=e.response.status_code, detail=f"Groq Error: {e.response.text}")
+        logger.error(f"Groq API Error: {e.response.text}")
+        raise HTTPException(status_code=500, detail="AI service is currently unavailable.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal server error occurred.")
