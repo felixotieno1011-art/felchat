@@ -74,3 +74,48 @@ btnSend.addEventListener('click', sendMessage);
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
+
+// --- LOG UPLOAD LOGIC ---
+const btnUpload = document.getElementById('btn-upload');
+if (btnUpload) {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.log,.txt';
+
+    btnUpload.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        appendMessage(`Uploading log file: ${file.name}...`, 'user');
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message assistant';
+        loadingDiv.textContent = 'FelChat is analyzing the logs...';
+        chatMessages.appendChild(loadingDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/logs/analyze', {
+                method: 'POST',
+                credentials: 'include',
+                body: formData
+            });
+            const data = await res.json();
+            chatMessages.removeChild(loadingDiv);
+
+            if (!res.ok) {
+                appendMessage(`Error: ${data.detail}`, 'assistant');
+                return;
+            }
+            appendMessage(`**Log Analysis Complete:**\n\n${data.ai_analysis}`, 'assistant');
+        } catch (err) {
+            chatMessages.removeChild(loadingDiv);
+            appendMessage(`Network error: ${err.message}`, 'assistant');
+        }
+        fileInput.value = '';
+    });
+}

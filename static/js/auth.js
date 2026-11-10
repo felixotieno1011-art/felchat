@@ -1,12 +1,22 @@
 const authContainer = document.getElementById('auth-container');
 const chatContainer = document.getElementById('chat-container');
-const authForm = document.getElementById('auth-form');
 const authError = document.getElementById('auth-error');
 
-// If we already have a token, go straight to chat
-if (localStorage.getItem('felchat_token')) {
-    showChat();
+// On load, ask the backend if we have a valid cookie
+async function checkSession() {
+    try {
+        const res = await fetch('/auth/me', { credentials: 'include' });
+        if (res.ok) {
+            showChat();
+        } else {
+            showAuth();
+        }
+    } catch (e) {
+        showAuth();
+    }
 }
+
+checkSession();
 
 async function handleAuth(endpoint) {
     const email = document.getElementById('email').value;
@@ -17,6 +27,7 @@ async function handleAuth(endpoint) {
         const res = await fetch(`/auth/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email, password })
         });
 
@@ -26,7 +37,6 @@ async function handleAuth(endpoint) {
             throw new Error(data.detail || 'Authentication failed');
         }
 
-        localStorage.setItem('felchat_token', data.access_token);
         showChat();
     } catch (err) {
         authError.textContent = err.message;
@@ -36,13 +46,18 @@ async function handleAuth(endpoint) {
 document.getElementById('btn-login').addEventListener('click', () => handleAuth('login'));
 document.getElementById('btn-register').addEventListener('click', () => handleAuth('register'));
 
-document.getElementById('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('felchat_token');
-    authContainer.classList.remove('hidden');
-    chatContainer.classList.add('hidden');
+document.getElementById('btn-logout').addEventListener('click', async () => {
+    // Tell backend to destroy the HttpOnly cookie
+    await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+    showAuth();
 });
 
 function showChat() {
     authContainer.classList.add('hidden');
     chatContainer.classList.remove('hidden');
+}
+
+function showAuth() {
+    authContainer.classList.remove('hidden');
+    chatContainer.classList.add('hidden');
 }

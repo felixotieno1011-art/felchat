@@ -18,7 +18,13 @@ class MessageItem(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    history: list[MessageItem] = [] # <-- NEW: Accepts previous messages
+    history: list[MessageItem] = []
+
+    # Limit history to prevent token exhaustion
+    def __init__(self, **data):
+        super().__init__(**data)
+        if len(self.history) > 10:
+            self.history = self.history[-10:] # <-- NEW: Accepts previous messages
 
 class ChatResponse(BaseModel):
     reply: str
@@ -52,9 +58,10 @@ async def send_message(
     # 4. Assemble the full conversation (System + History + Current Message)
     messages = [{"role": "system", "content": system_prompt}]
     
-    # Add the history sent from the frontend
+    # SECURITY: Whitelist roles and scan history for injection
     for msg in payload.history:
-        messages.append({"role": msg.role, "content": msg.content})
+        if msg.role in ["user", "assistant"] and not check_prompt_injection(msg.content):
+            messages.append({"role": msg.role, "content": msg.content})
         
     # Add the current user message
     messages.append({"role": "user", "content": payload.message})
