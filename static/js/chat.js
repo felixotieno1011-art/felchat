@@ -2,30 +2,31 @@ const chatInput = document.getElementById('chat-input');
 const btnSend = document.getElementById('btn-send');
 const chatMessages = document.getElementById('chat-messages');
 
-// This array holds the conversation history
 let conversationHistory = [];
+let isGenerating = false; // Prevents double-sending
 
 function appendMessage(text, role) {
     const div = document.createElement('div');
     div.className = `message ${role}`;
     if (role === 'assistant') {
         div.innerHTML = DOMPurify.sanitize(marked.parse(text));
-        // Save to history
         conversationHistory.push({ role: "assistant", content: text });
     } else {
         div.textContent = text;
-        // Save to history
         conversationHistory.push({ role: "user", content: text });
     }
     chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Smooth scroll to bottom
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 }
 
 async function sendMessage() {
     const text = chatInput.value.trim();
-    if (!text) return;
+    if (!text || isGenerating) return;
 
-    // Show user message (and add to history)
+    isGenerating = true;
+    btnSend.disabled = true; // Disable button while thinking
+
     appendMessage(text, 'user');
     chatInput.value = '';
 
@@ -33,28 +34,25 @@ async function sendMessage() {
     loadingDiv.className = 'message assistant';
     loadingDiv.textContent = 'FelChat is thinking...';
     chatMessages.appendChild(loadingDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 
     try {
-        const token = localStorage.getItem('felchat_token');
-        
-        // We send the history BEFORE the current message (the current message is handled by the backend)
-        // We limit to the last 10 messages to save tokens
         const historyToSend = conversationHistory.slice(-10, -1); 
 
         const res = await fetch('/chat/message', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ 
-                message: text,
-                history: historyToSend
-            })
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, history: historyToSend })
         });
 
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch (e) {
+            throw new Error("Server returned an invalid response (not JSON).");
+        }
+
         chatMessages.removeChild(loadingDiv);
 
         if (!res.ok) {
@@ -65,57 +63,22 @@ async function sendMessage() {
         appendMessage(data.reply, 'assistant');
 
     } catch (err) {
-        chatMessages.removeChild(loadingDiv);
+        if (chatMessages.contains(loadingDiv)) {
+            chatMessages.removeChild(loadingDiv);
+        }
         appendMessage(`Network error: ${err.message}`, 'assistant');
+    } finally {
+        isGenerating = false;
+        btnSend.disabled = false;
+        chatInput.focus();
     }
 }
 
+// Use 'keydown' instead of deprecated 'keypress' to support mobile keyboards properly
 btnSend.addEventListener('click', sendMessage);
-chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
 });
-
-// --- LOG UPLOAD LOGIC ---
-const btnUpload = document.getElementById('btn-upload');
-if (btnUpload) {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.log,.txt';
-
-    btnUpload.addEventListener('click', () => fileInput.click());
-
-    fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        appendMessage(`Uploading log file: ${file.name}...`, 'user');
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'message assistant';
-        loadingDiv.textContent = 'FelChat is analyzing the logs...';
-        chatMessages.appendChild(loadingDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const res = await fetch('/logs/analyze', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-            const data = await res.json();
-            chatMessages.removeChild(loadingDiv);
-
-            if (!res.ok) {
-                appendMessage(`Error: ${data.detail}`, 'assistant');
-                return;
-            }
-            appendMessage(`**Log Analysis Complete:**\n\n${data.ai_analysis}`, 'assistant');
-        } catch (err) {
-            chatMessages.removeChild(loadingDiv);
-            appendMessage(`Network error: ${err.message}`, 'assistant');
-        }
-        fileInput.value = '';
-    });
-}

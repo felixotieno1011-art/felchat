@@ -1,4 +1,5 @@
 import httpx
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from app.rag.service import retrieve_context
 from app.security.waf import check_prompt_injection
 from app.security.ratelimit import check_rate_limit
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 class MessageItem(BaseModel):
@@ -19,12 +21,6 @@ class MessageItem(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: list[MessageItem] = []
-
-    # Limit history to prevent token exhaustion
-    def __init__(self, **data):
-        super().__init__(**data)
-        if len(self.history) > 10:
-            self.history = self.history[-10:] # <-- NEW: Accepts previous messages
 
 class ChatResponse(BaseModel):
     reply: str
@@ -51,19 +47,20 @@ async def send_message(
     # 3. Build the prompt
     system_prompt = (
         "You are FelChat, a highly intelligent, professional, and security-focused AI assistant. "
-        "You have access to a database of real CVEs AND information about Felix Otieno's cybersecurity portfolio projects (zero-trust-gateway, cloud-native-siem, recon-platform, honeypot-factory, felchat). If the user asks about Felix or his projects, use the context to describe them.\n\n"
+        "You have a live web search tool. If the user asks about recent events, sports, news, or anything that happened after mid-2024, you MUST use the web search tool to get the current answer. "
+        "You also have access to a database of real CVEs. Use the provided context if the question is about security vulnerabilities.\n\n"
         f"--- CONTEXT ---\n{rag_context}\n---------------\n"
     )
 
-    # 4. Assemble the full conversation (System + History + Current Message)
+    # 4. Assemble the full conversation
     messages = [{"role": "system", "content": system_prompt}]
     
-    # SECURITY: Whitelist roles and scan history for injection
+    # Add sanitized history
     for msg in payload.history:
         if msg.role in ["user", "assistant"] and not check_prompt_injection(msg.content):
             messages.append({"role": msg.role, "content": msg.content})
         
-    # Add the current user message
+    # Add current message
     messages.append({"role": "user", "content": payload.message})
 
     try:
