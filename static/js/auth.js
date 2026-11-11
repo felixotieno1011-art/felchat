@@ -2,7 +2,6 @@ const authContainer = document.getElementById('auth-container');
 const chatContainer = document.getElementById('chat-container');
 const authError = document.getElementById('auth-error');
 
-// On load, ask the backend if we have a valid cookie
 async function checkSession() {
     try {
         const res = await fetch('/auth/me', { credentials: 'include' });
@@ -31,10 +30,24 @@ async function handleAuth(endpoint) {
             body: JSON.stringify({ email, password })
         });
 
-        const data = await res.json();
+        const contentType = res.headers.get("content-type");
+        let data;
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            data = await res.json();
+        } else {
+            const text = await res.text();
+            throw new Error(`Server error (${res.status}): ${text.substring(0, 50)}...`);
+        }
 
         if (!res.ok) {
-            throw new Error(data.detail || 'Authentication failed');
+            // FIX: Handle FastAPI validation errors (which come as an array)
+            if (data.detail && Array.isArray(data.detail)) {
+                throw new Error(data.detail[0].msg);
+            } else if (typeof data.detail === 'object') {
+                throw new Error(JSON.stringify(data.detail));
+            } else {
+                throw new Error(data.detail || 'Authentication failed');
+            }
         }
 
         showChat();
@@ -47,7 +60,6 @@ document.getElementById('btn-login').addEventListener('click', () => handleAuth(
 document.getElementById('btn-register').addEventListener('click', () => handleAuth('register'));
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
-    // Tell backend to destroy the HttpOnly cookie
     await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
     showAuth();
 });
