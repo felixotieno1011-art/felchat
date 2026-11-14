@@ -8,6 +8,30 @@ class GroqClient:
         self.model = settings.GROQ_MODEL
         self.url = "https://api.groq.com/openai/v1/chat/completions"
 
+    # Non-streaming call (used by log analyzer)
+    async def chat(self, messages: list[dict]) -> str:
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 2048
+            # No tools for log analysis (browser_search can hang)
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(self.url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            choices = data.get("choices", [])
+            if choices:
+                return choices[0]["message"]["content"]
+            return "No response generated."
+
+    # Streaming call (used by chat)
     async def stream_chat(self, messages: list[dict]):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -20,7 +44,7 @@ class GroqClient:
             "max_tokens": 2048,
             "tools": [{"type": "browser_search"}],
             "tool_choice": "auto",
-            "stream": True  # <-- The magic word
+            "stream": True
         }
 
         async with httpx.AsyncClient(timeout=60.0) as client:

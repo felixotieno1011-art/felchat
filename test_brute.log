@@ -1,5 +1,0 @@
-Jan 10 12:00:01 server sshd[123]: Failed password for root from 192.168.1.100 port 22
-Jan 10 12:00:02 server sshd[123]: Invalid user admin from 192.168.1.100
-Jan 10 12:00:03 server sshd[123]: Failed password for root from 192.168.1.100 port 22
-Jan 10 12:00:04 server sshd[123]: Accepted password for root from 192.168.1.100 port 22
-Jan 10 12:00:05 server nginx: GET /../../etc/passwd HTTP/1.1 404 Not Found
