@@ -24,5 +24,5 @@ async def check_rate_limit(user_id: str, limit: int = 20, window: int = 60):
     if current > limit:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Rate limit exceeded. You can send {limit} messages per minute."
+            detail=f"Rate limit exceeded. Please wait before trying again."
         )
