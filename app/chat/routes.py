@@ -34,14 +34,15 @@ async def send_message(
 
     await check_rate_limit(str(current_user.id))
 
-    # WAF Check
+    # FIX: Enforce message size limit
+    if len(payload.message) > 5000:
+        raise HTTPException(status_code=413, detail="Message too long. Maximum 5000 characters.")
+
     if check_prompt_injection(payload.message):
-        # If blocked, stream a single chunk
         async def blocked():
             yield "⚠️ Security Alert: Your message was flagged for prompt injection."
         return StreamingResponse(blocked(), media_type="text/plain")
 
-    # RAG Context
     rag_context = await retrieve_context(payload.message, db)
 
     system_prompt = (
@@ -54,7 +55,10 @@ async def send_message(
     messages = [{"role": "system", "content": system_prompt}]
     for msg in payload.history:
         if msg.role in ["user", "assistant"]:
-            if "⚠️ Security Alert" in msg.content or "Network error" in msg.content:
+            if "⚠️ Security Alert" in msg.content or "Network error" in msg.content or "[Error:" in msg.content:
+                continue
+            # FIX: WAF scan on history too (blocks poisoned history)
+            if check_prompt_injection(msg.content):
                 continue
             messages.append({"role": msg.role, "content": msg.content})
     messages.append({"role": "user", "content": payload.message})

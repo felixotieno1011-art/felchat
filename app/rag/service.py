@@ -47,7 +47,7 @@ async def retrieve_context(query: str, db: AsyncSession, limit: int = 3) -> str:
         stmt = (
             select(Document)
             .order_by(Document.embedding.cosine_distance(query_vector))
-            .where(Document.embedding.cosine_distance(query_vector) < 0.6)
+            .where(Document.embedding.cosine_distance(query_vector) < 0.4)
             .limit(limit)
         )
         result = await db.execute(stmt)

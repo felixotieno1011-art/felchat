@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     HF_TOKEN: str = ""
     HF_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    ENVIRONMENT: str = "development"
 
 
 settings = Settings()
