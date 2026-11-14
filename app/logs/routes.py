@@ -13,7 +13,6 @@ async def analyze_log(file: UploadFile = File(...), current_user: User = Depends
     if not file.filename.lower().endswith(('.log', '.txt')):
         raise HTTPException(status_code=400, detail="Only .log or .txt files allowed")
 
-    # FIX: Limit file size to 5MB to prevent DoS
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large. Maximum size is 5MB.")
@@ -27,7 +26,7 @@ async def analyze_log(file: UploadFile = File(...), current_user: User = Depends
     if report["total_lines"] == 0:
         raise HTTPException(status_code=400, detail="File is empty")
 
-    system_prompt = "You are FelChat, a cybersecurity analyst. Explain these log findings."
+    system_prompt = "You are FelChat, a cybersecurity analyst. Explain these log findings and highlight any brute-force successes."
     user_prompt = f"Findings:\n{report}"
 
     messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
@@ -36,6 +35,5 @@ async def analyze_log(file: UploadFile = File(...), current_user: User = Depends
         ai_analysis = await llm_client.chat(messages)
         return {"report": report, "ai_analysis": ai_analysis}
     except Exception as e:
-        # FIX: Log the real error, show a generic message to the user
         logger.error(f"Groq Log Analysis Error: {str(e)}")
-        return {"report": report, "ai_analysis": "Could not generate AI summary at this time due to a server error."}
+        return {"report": report, "ai_analysis": "Could not generate AI summary at this time."}

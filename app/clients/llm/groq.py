@@ -1,4 +1,5 @@
 import httpx
+import json
 from app.core.config import settings
 
 class GroqClient:
@@ -7,7 +8,7 @@ class GroqClient:
         self.model = settings.GROQ_MODEL
         self.url = "https://api.groq.com/openai/v1/chat/completions"
 
-    async def chat(self, messages: list[dict]) -> str:
+    async def stream_chat(self, messages: list[dict]):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -16,20 +17,26 @@ class GroqClient:
             "model": self.model,
             "messages": messages,
             "temperature": 0.7,
-            "max_tokens": 1024,
+            "max_tokens": 2048,
             "tools": [{"type": "browser_search"}],
-            # Changed to "auto" so it doesn't break on simple greetings
-            "tool_choice": "auto" 
+            "tool_choice": "auto",
+            "stream": True  # <-- The magic word
         }
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(self.url, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            
-            choices = data.get("choices", [])
-            if choices:
-                return choices[0]["message"]["content"]
-            return "No response generated."
+            async with client.stream("POST", self.url, headers=headers, json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        if data_str.strip() == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data["choices"][0]["delta"]
+                            if "content" in delta and delta["content"] is not None:
+                                yield delta["content"]
+                        except Exception:
+                            pass
 
 llm_client = GroqClient()

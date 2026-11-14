@@ -2,6 +2,7 @@ const authContainer = document.getElementById('auth-container');
 const chatContainer = document.getElementById('chat-container');
 const authError = document.getElementById('auth-error');
 
+// On page load, check if the session cookie is still valid
 async function checkSession() {
     try {
         const res = await fetch('/auth/me', { credentials: 'include' });
@@ -36,18 +37,14 @@ async function handleAuth(endpoint) {
             data = await res.json();
         } else {
             const text = await res.text();
-            throw new Error(`Server error (${res.status}): ${text.substring(0, 50)}...`);
+            throw new Error(`Server error (${res.status})`);
         }
 
         if (!res.ok) {
-            // FIX: Handle FastAPI validation errors (which come as an array)
             if (data.detail && Array.isArray(data.detail)) {
                 throw new Error(data.detail[0].msg);
-            } else if (typeof data.detail === 'object') {
-                throw new Error(JSON.stringify(data.detail));
-            } else {
-                throw new Error(data.detail || 'Authentication failed');
             }
+            throw new Error(data.detail || 'Authentication failed');
         }
 
         showChat();
@@ -59,8 +56,11 @@ async function handleAuth(endpoint) {
 document.getElementById('btn-login').addEventListener('click', () => handleAuth('login'));
 document.getElementById('btn-register').addEventListener('click', () => handleAuth('register'));
 
+// Proper Logout: destroys the HttpOnly cookie on the server
 document.getElementById('btn-logout').addEventListener('click', async () => {
-    await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+    try {
+        await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch(e) {}
     showAuth();
 });
 
@@ -73,3 +73,8 @@ function showAuth() {
     authContainer.classList.remove('hidden');
     chatContainer.classList.add('hidden');
 }
+
+// Expose a global function so chat.js can kick user back to login on 401
+window.handleSessionExpired = () => {
+    showAuth();
+};
